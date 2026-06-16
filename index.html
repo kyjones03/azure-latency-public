@@ -7,7 +7,15 @@
   <style>
     body { font-family: system-ui, sans-serif; margin: 24px; background:#0f172a; color:#e2e8f0; }
     h1 { color:#38bdf8; margin:0 0 8px; }
-    .meta { color:#94a3b8; margin:0 0 16px; }
+    .meta { color:#94a3b8; margin:0 0 10px; }
+    .legend { margin:0 0 14px; display:flex; gap:12px; flex-wrap:wrap; align-items:center; font-size:12px; color:#cbd5e1; }
+    .chip { display:inline-flex; align-items:center; gap:6px; border:1px solid #334155; border-radius:999px; padding:4px 8px; background:#111827; }
+    .dot { width:10px; height:10px; border-radius:999px; display:inline-block; }
+    .dot.good { background:#166534; }
+    .dot.warn { background:#f59e0b; }
+    .dot.bad { background:#dc2626; }
+    .dot.none { background:#1f2937; border:1px solid #334155; }
+    a { color:#7dd3fc; }
     .wrap { overflow:auto; border:1px solid #334155; border-radius:8px; }
     table { border-collapse: collapse; min-width: 100%; }
     th, td { border:1px solid #334155; padding:8px; text-align:center; font-size:12px; }
@@ -20,8 +28,15 @@
   </style>
 </head>
 <body>
-  <h1>Azure Region Latency Matrix</h1>
+  <h1>Azure Region TCP RTT Matrix</h1>
   <p class="meta" id="meta">Loading snapshot…</p>
+  <div class="legend">
+    <span class="chip"><span class="dot good"></span> Good: &lt; 30 ms</span>
+    <span class="chip"><span class="dot warn"></span> Warn: 30–79 ms</span>
+    <span class="chip"><span class="dot bad"></span> Poor: ≥ 80 ms</span>
+    <span class="chip"><span class="dot none"></span> No data</span>
+    <span>Baseline reference: <a href="https://learn.microsoft.com/en-us/azure/networking/azure-network-latency" target="_blank" rel="noopener noreferrer">Azure network latency tables</a></span>
+  </div>
   <div class="wrap" id="matrix"></div>
 
   <script>
@@ -29,8 +44,8 @@
 
     function band(ms) {
       if (ms == null || Number.isNaN(ms)) return 'none';
-      if (ms < 80) return 'good';
-      if (ms < 250) return 'warn';
+      if (ms < 30) return 'good';
+      if (ms < 80) return 'warn';
       return 'bad';
     }
 
@@ -67,9 +82,9 @@
             continue;
           }
           const ev = matrix[src.name]?.[dst.name] ?? null;
-          const ms = ev?.httpTotalMs ?? ev?.latencyMs ?? null;
+          const ms = ev?.tcpRttMs ?? null;
           const title = ev
-            ? `${regionByName.get(src.name)?.displayName} -> ${regionByName.get(dst.name)?.displayName}\nTCP: ${fmt(ev.tcpRttMs)}\nHTTP: ${fmt(ev.httpTotalMs ?? ev.latencyMs)}\nTimestamp: ${ev.timestamp}`
+            ? `${regionByName.get(src.name)?.displayName} -> ${regionByName.get(dst.name)?.displayName}\nTCP RTT: ${fmt(ev.tcpRttMs)}\nTimestamp: ${ev.timestamp}`
             : `${src.name} -> ${dst.name}: no data`;
           html += `<td class="${band(ms)}" title="${title}">${fmt(ms)}</td>`;
         }

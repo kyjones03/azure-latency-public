@@ -2,17 +2,33 @@ import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { EventHubConsumerClient, earliestEventPosition } from "@azure/event-hubs";
 import { DefaultAzureCredential } from "@azure/identity";
 
-const namespace = process.env.EVENTHUB_NAMESPACE;
+const rawNamespace = process.env.EVENTHUB_NAMESPACE;
 const eventHubName = process.env.EVENTHUB_NAME || "probe-events";
-const hopsNamespace = process.env.HOPS_EVENTHUB_NAMESPACE || namespace;
+const rawHopsNamespace = process.env.HOPS_EVENTHUB_NAMESPACE || rawNamespace;
 const hopsEventHubName = process.env.HOPS_EVENTHUB_NAME || "probe-hops";
 const consumerGroup = process.env.EVENTHUB_CONSUMER_GROUP ?? "$Default";
 const lookbackMinutes = Number(process.env.SNAPSHOT_LOOKBACK_MINUTES ?? "90");
 const readSeconds = Number(process.env.SNAPSHOT_READ_SECONDS ?? "45");
 
-if (!namespace) {
+if (!rawNamespace) {
   console.error("Missing EVENTHUB_NAMESPACE");
   process.exit(1);
+}
+
+function normalizeNamespace(value) {
+  if (!value) return value;
+  if (value.includes(".")) return value;
+  return `${value}.servicebus.windows.net`;
+}
+
+const namespace = normalizeNamespace(rawNamespace);
+const hopsNamespace = normalizeNamespace(rawHopsNamespace);
+
+if (namespace !== rawNamespace) {
+  console.warn(`EVENTHUB_NAMESPACE normalized to ${namespace}`);
+}
+if (rawHopsNamespace && hopsNamespace !== rawHopsNamespace) {
+  console.warn(`HOPS_EVENTHUB_NAMESPACE normalized to ${hopsNamespace}`);
 }
 
 function pairKey(event) {
@@ -23,6 +39,7 @@ async function collectLatestEvents({ fqns, hubName, validate }) {
   const credential = new DefaultAzureCredential();
   const client = new EventHubConsumerClient(consumerGroup, fqns, hubName, credential);
   const latest = new Map();
+  const errors = [];
   const startPosition = Number.isFinite(lookbackMinutes) && lookbackMinutes > 0
     ? { enqueuedOn: new Date(Date.now() - lookbackMinutes * 60 * 1000) }
     : earliestEventPosition;
@@ -42,6 +59,7 @@ async function collectLatestEvents({ fqns, hubName, validate }) {
         }
       },
       processError: async (err) => {
+        errors.push(err);
         console.error(`[${hubName}] consumer error: ${err.message}`);
       },
     },
@@ -51,6 +69,10 @@ async function collectLatestEvents({ fqns, hubName, validate }) {
   await new Promise((resolve) => setTimeout(resolve, readSeconds * 1000));
   await subscription.close();
   await client.close();
+
+  if (errors.length > 0 && latest.size === 0) {
+    throw new Error(`[${hubName}] no events collected; first consumer error: ${errors[0].message}`);
+  }
 
   return Array.from(latest.values()).sort((a, b) => {
     if (a.sourceRegion === b.sourceRegion) {
