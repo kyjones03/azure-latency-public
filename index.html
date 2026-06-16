@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Azure Region Latency Matrix</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 24px; background:#0f172a; color:#e2e8f0; }
+    h1 { color:#38bdf8; margin:0 0 8px; }
+    .meta { color:#94a3b8; margin:0 0 16px; }
+    .wrap { overflow:auto; border:1px solid #334155; border-radius:8px; }
+    table { border-collapse: collapse; min-width: 100%; }
+    th, td { border:1px solid #334155; padding:8px; text-align:center; font-size:12px; }
+    th { background:#1e293b; color:#94a3b8; }
+    td.self { background:#1e293b; color:#475569; }
+    td.none { background:#111827; color:#475569; }
+    td.good { background:#166534; color:#dcfce7; }
+    td.warn { background:#f59e0b; color:#431407; }
+    td.bad { background:#dc2626; color:#fee2e2; }
+  </style>
+</head>
+<body>
+  <h1>Azure Region Latency Matrix</h1>
+  <p class="meta" id="meta">Loading snapshot…</p>
+  <div class="wrap" id="matrix"></div>
+
+  <script>
+    const byName = (regions) => new Map(regions.map(r => [r.name, r]));
+
+    function band(ms) {
+      if (ms == null || Number.isNaN(ms)) return 'none';
+      if (ms < 80) return 'good';
+      if (ms < 250) return 'warn';
+      return 'bad';
+    }
+
+    function fmt(ms) {
+      if (ms == null || Number.isNaN(ms)) return '—';
+      return Math.round(ms) + ' ms';
+    }
+
+    async function boot() {
+      const [regionsRes, snapshotRes] = await Promise.all([
+        fetch('./data/regions.json'),
+        fetch('./data/snapshot.json', { cache: 'no-store' })
+      ]);
+
+      if (!regionsRes.ok || !snapshotRes.ok) throw new Error('Failed to load data files');
+
+      const regions = await regionsRes.json();
+      const snapshot = await snapshotRes.json();
+      const matrix = snapshot.matrix || {};
+      const regionByName = byName(regions);
+
+      document.getElementById('meta').textContent =
+        `Generated: ${snapshot.generatedAt || 'n/a'} · probe pairs: ${snapshot.probe?.count ?? 0}`;
+
+      let html = '<table><tr><th></th>';
+      for (const dst of regions) html += `<th title="${dst.displayName}">${dst.shortLabel}</th>`;
+      html += '</tr>';
+
+      for (const src of regions) {
+        html += `<tr><th title="${src.displayName}">${src.shortLabel}</th>`;
+        for (const dst of regions) {
+          if (src.name === dst.name) {
+            html += '<td class="self">—</td>';
+            continue;
+          }
+          const ev = matrix[src.name]?.[dst.name] ?? null;
+          const ms = ev?.httpTotalMs ?? ev?.latencyMs ?? null;
+          const title = ev
+            ? `${regionByName.get(src.name)?.displayName} -> ${regionByName.get(dst.name)?.displayName}\nTCP: ${fmt(ev.tcpRttMs)}\nHTTP: ${fmt(ev.httpTotalMs ?? ev.latencyMs)}\nTimestamp: ${ev.timestamp}`
+            : `${src.name} -> ${dst.name}: no data`;
+          html += `<td class="${band(ms)}" title="${title}">${fmt(ms)}</td>`;
+        }
+        html += '</tr>';
+      }
+
+      html += '</table>';
+      document.getElementById('matrix').innerHTML = html;
+    }
+
+    boot().catch((err) => {
+      document.getElementById('meta').textContent = `Error: ${err.message}`;
+      console.error(err);
+    });
+  </script>
+</body>
+</html>

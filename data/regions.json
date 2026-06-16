@@ -1,0 +1,11 @@
+[
+  { "name": "eastus",        "displayName": "East US",           "shortLabel": "EUS"  },
+  { "name": "eastus2",       "displayName": "East US 2",         "shortLabel": "EUS2" },
+  { "name": "centralus",     "displayName": "Central US",        "shortLabel": "CUS"  },
+  { "name": "northcentralus","displayName": "North Central US",  "shortLabel": "NCUS" },
+  { "name": "southcentralus","displayName": "South Central US",  "shortLabel": "SCUS" },
+  { "name": "westcentralus", "displayName": "West Central US",   "shortLabel": "WCUS" },
+  { "name": "westus",        "displayName": "West US",           "shortLabel": "WUS"  },
+  { "name": "westus2",       "displayName": "West US 2",         "shortLabel": "WUS2" },
+  { "name": "westus3",       "displayName": "West US 3",         "shortLabel": "WUS3" }
+]

@@ -1,0 +1,12 @@
+{
+  "generatedAt": null,
+  "lookbackMinutes": 0,
+  "probe": {
+    "count": 0,
+    "results": []
+  },
+  "hops": {
+    "count": 0,
+    "results": []
+  }
+}

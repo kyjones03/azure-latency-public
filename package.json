@@ -1,0 +1,12 @@
+{
+  "name": "azure-latency-public",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "snapshot": "node scripts/build-snapshot.mjs"
+  },
+  "dependencies": {
+    "@azure/event-hubs": "^6.0.0",
+    "@azure/identity": "^4.13.0"
+  }
+}
