@@ -1,57 +1,63 @@
-# Azure Latency Public Dashboard (GitHub Pages)
+# Azure Region Latency Matrix
 
-Static GitHub Pages site that publishes an Event Hub snapshot (`data/snapshot.json`) every 5 minutes.
+A public dashboard showing **live TCP round-trip times between Azure U.S. regions** — measured from real Azure infrastructure, refreshed every 30 minutes.
 
-## Why This Shape
+> **Baseline reference:** [Azure network latency tables](https://learn.microsoft.com/en-us/azure/networking/azure-network-latency) — Microsoft's published P50 values for comparison.
 
-GitHub Pages is static hosting only. It cannot hold a runtime managed identity or safely use a service principal secret in browser code.
+---
 
-So we authenticate in **GitHub Actions** and publish data files for the page.
+## What You're Looking At
 
-## Auth Recommendation
+The matrix shows how long it takes for a TCP connection to travel from one Azure region to another, measured over Microsoft's own backbone network. Each cell is the **median RTT from 15 samples** taken by a probe running inside Azure.
 
-Use **federated credentials (OIDC)** from GitHub Actions to Azure Entra ID.
+### Color bands
 
-- No client secret stored in GitHub
-- Short-lived tokens
-- Least privilege RBAC on Event Hub receiver
+| Color | TCP RTT |
+|-------|---------|
+| 🟩 Green | < 30 ms |
+| 🟨 Yellow | 30 – 79 ms |
+| 🟥 Red | ≥ 80 ms |
 
-## Required Azure Setup
+Hover over a cell to see the raw measurement and timestamp.
 
-1. Create Entra app registration for this repo's workflow identity.
-2. Add **federated credential** scoped to repo + branch/environment.
-3. Assign RBAC on Event Hub namespace:
-   - `Azure Event Hubs Data Receiver`
-4. Add GitHub repository variables:
-   - `AZURE_CLIENT_ID`
-   - `AZURE_TENANT_ID`
-   - `AZURE_SUBSCRIPTION_ID`
-   - `EVENTHUB_NAMESPACE`
-   - `EVENTHUB_NAME` (optional; defaults to `probe-events`)
-   - `HOPS_EVENTHUB_NAMESPACE` (optional)
-   - `HOPS_EVENTHUB_NAME` (optional)
+---
 
-## Local Run
+## How It Works
 
-```bash
-npm install
-az login
-export EVENTHUB_NAMESPACE="<namespace>.servicebus.windows.net"
-npm run snapshot
-# open index.html with a static server
+Probe workers are deployed as Azure Function Apps — one per U.S. region. Every 5 minutes, each probe connects to a region-pinned target in all other regions, runs 15 TCP samples, and publishes the results to Azure Event Hubs.
+
+A GitHub Actions workflow picks that up every 30 minutes, reads the most recent results for each region pair, and publishes them as a static data file. The page reads that file on load.
+
+```
+Azure Function Apps (9 regions)
+    │  measure TCP RTT every 5 min
+    ▼
+Azure Event Hubs
+    │  GitHub Actions reads via OIDC (every 30 min)
+    ▼
+data/snapshot.json
+    │  served as static file
+    ▼
+GitHub Pages (this site)
 ```
 
-## Workflow
+### Probe details
 
-`.github/workflows/publish-pages.yml`
+- **Source regions:** East US, East US 2, Central US, North Central US, South Central US, West Central US, West US, West US 2, West US 3
+- **Samples per pair:** 15, aggregated to median (P50)
+- **Metrics captured:** TCP RTT, DNS, TLS, TTFB, and full HTTP timings
+- **Target hosts:** region-pinned Azure Blob Storage endpoints accessed over HTTPS within Azure's network
 
-- Runs every 5 minutes
-- Logs in to Azure with OIDC (`azure/login`)
-- Reads recent Event Hub events (`scripts/build-snapshot.mjs`)
-- Writes `data/snapshot.json`
-- Publishes the repo root to GitHub Pages
+---
 
-## Notes
+## Keeping the Data Fresh
 
-- Snapshot job reads with a lookback window (`SNAPSHOT_LOOKBACK_MINUTES`, default `90`).
-- If you want true real-time streaming, move to a backend/API host (Function App, Container Apps, etc.) and keep Pages as frontend only.
+The page data is static — it does not stream live. A GitHub Actions workflow re-publishes it every 30 minutes from the latest Event Hub snapshot.
+
+If you're seeing stale or empty data, the most likely cause is the probe pipeline being paused or the snapshot workflow not running. Check the [Actions tab](../../actions) for recent workflow runs.
+
+---
+
+## Source
+
+Probe infrastructure and dashboard code live in the private `azure-latency` repository. This public repo contains only the static site and the Actions workflow to populate it.
