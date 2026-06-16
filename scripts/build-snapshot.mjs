@@ -1,11 +1,11 @@
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { EventHubConsumerClient, earliestEventPosition } from "@azure/event-hubs";
-import { AzureCliCredential } from "@azure/identity";
+import { DefaultAzureCredential } from "@azure/identity";
 
 const namespace = process.env.EVENTHUB_NAMESPACE;
-const eventHubName = process.env.EVENTHUB_NAME ?? "probe-events";
-const hopsNamespace = process.env.HOPS_EVENTHUB_NAMESPACE ?? namespace;
-const hopsEventHubName = process.env.HOPS_EVENTHUB_NAME ?? "probe-hops";
+const eventHubName = process.env.EVENTHUB_NAME || "probe-events";
+const hopsNamespace = process.env.HOPS_EVENTHUB_NAMESPACE || namespace;
+const hopsEventHubName = process.env.HOPS_EVENTHUB_NAME || "probe-hops";
 const consumerGroup = process.env.EVENTHUB_CONSUMER_GROUP ?? "$Default";
 const lookbackMinutes = Number(process.env.SNAPSHOT_LOOKBACK_MINUTES ?? "90");
 const readSeconds = Number(process.env.SNAPSHOT_READ_SECONDS ?? "45");
@@ -20,7 +20,7 @@ function pairKey(event) {
 }
 
 async function collectLatestEvents({ fqns, hubName, validate }) {
-  const credential = new AzureCliCredential();
+  const credential = new DefaultAzureCredential();
   const client = new EventHubConsumerClient(consumerGroup, fqns, hubName, credential);
   const latest = new Map();
   const startPosition = Number.isFinite(lookbackMinutes) && lookbackMinutes > 0
@@ -83,9 +83,26 @@ function isHopEvent(value) {
 }
 
 async function main() {
+  console.log(`Reading probe hub: ${namespace}/${eventHubName}`);
+  const probePromise = collectLatestEvents({
+    fqns: namespace,
+    hubName: eventHubName,
+    validate: isProbeEvent,
+  });
+
+  console.log(`Reading hops hub: ${hopsNamespace}/${hopsEventHubName}`);
+  const hopsPromise = collectLatestEvents({
+    fqns: hopsNamespace,
+    hubName: hopsEventHubName,
+    validate: isHopEvent,
+  }).catch((err) => {
+    console.warn(`Hops snapshot skipped: ${err.message}`);
+    return [];
+  });
+
   const [probeResults, hopResults, regionsRaw] = await Promise.all([
-    collectLatestEvents({ fqns: namespace, hubName: eventHubName, validate: isProbeEvent }),
-    collectLatestEvents({ fqns: hopsNamespace, hubName: hopsEventHubName, validate: isHopEvent }),
+    probePromise,
+    hopsPromise,
     readFile(new URL("../data/regions.json", import.meta.url), "utf-8"),
   ]);
 
