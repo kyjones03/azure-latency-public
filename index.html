@@ -7,15 +7,63 @@
   <style>
     body { font-family: system-ui, sans-serif; margin: 24px; background:#0f172a; color:#e2e8f0; }
     h1 { color:#38bdf8; margin:0 0 8px; }
-    .meta { color:#94a3b8; margin:0 0 10px; }
-    .legend { margin:0 0 14px; display:flex; gap:12px; flex-wrap:wrap; align-items:center; font-size:12px; color:#cbd5e1; }
+    .meta { color:#94a3b8; margin:0 0 12px; font-size:0.8rem; }
+    a { color:#7dd3fc; }
+
+    /* Legend */
+    .legend { margin:0 0 16px; display:flex; gap:12px; flex-wrap:wrap; align-items:center; font-size:12px; color:#cbd5e1; }
     .chip { display:inline-flex; align-items:center; gap:6px; border:1px solid #334155; border-radius:999px; padding:4px 8px; background:#111827; }
     .dot { width:10px; height:10px; border-radius:999px; display:inline-block; }
     .dot.good { background:#166534; }
     .dot.warn { background:#f59e0b; }
     .dot.bad { background:#dc2626; }
     .dot.none { background:#1f2937; border:1px solid #334155; }
-    a { color:#7dd3fc; }
+
+    /* Filters */
+    .filters { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:16px; }
+    .filter-card {
+      background:#1e293b; border:1px solid #334155; border-radius:8px;
+      padding:10px 12px; min-width:200px; flex:1; max-width:320px;
+    }
+    .filter-card > .filter-label {
+      display:block; font-size:0.7rem; text-transform:uppercase;
+      letter-spacing:0.05em; color:#64748b; margin-bottom:8px;
+    }
+    details.filter-drop { position:relative; }
+    details.filter-drop summary {
+      list-style:none; display:flex; align-items:center; gap:8px;
+      background:#0f172a; border:1px solid #334155; border-radius:6px;
+      padding:6px 10px; font-size:0.85rem; color:#e2e8f0; cursor:pointer;
+      user-select:none;
+    }
+    details.filter-drop summary::-webkit-details-marker { display:none; }
+    details.filter-drop summary::before {
+      content:'▶'; font-size:0.6rem; color:#64748b;
+      transition:transform 0.15s; flex-shrink:0;
+    }
+    details.filter-drop[open] summary::before { transform:rotate(90deg); }
+    .filter-drop-panel {
+      position:absolute; z-index:50; top:calc(100% + 4px); left:0; right:0;
+      background:#1e293b; border:1px solid #475569; border-radius:6px;
+      box-shadow:0 8px 24px #0006; padding:8px;
+    }
+    .filter-actions { display:flex; gap:6px; margin-bottom:8px; }
+    .filter-actions button {
+      font-size:0.72rem; padding:2px 8px; border-radius:4px;
+      border:1px solid #334155; background:#0f172a; color:#94a3b8;
+      cursor:pointer; transition:background 0.15s;
+    }
+    .filter-actions button:hover { background:#334155; color:#e2e8f0; }
+    .filter-options { display:flex; flex-direction:column; gap:4px; max-height:200px; overflow-y:auto; }
+    .filter-options label {
+      display:flex; align-items:center; gap:6px;
+      font-size:0.8rem; color:#cbd5e1; cursor:pointer;
+      padding:2px 4px; border-radius:4px;
+    }
+    .filter-options label:hover { background:#334155; }
+    .filter-options input[type=checkbox] { accent-color:#38bdf8; cursor:pointer; flex-shrink:0; }
+
+    /* Matrix */
     .wrap { overflow:auto; border:1px solid #334155; border-radius:8px; }
     table { border-collapse: collapse; min-width: 100%; }
     th, td { border:1px solid #334155; padding:8px; text-align:center; font-size:12px; }
@@ -25,11 +73,26 @@
     td.good { background:#166534; color:#dcfce7; }
     td.warn { background:#f59e0b; color:#431407; }
     td.bad { background:#dc2626; color:#fee2e2; }
+
+    /* How it works */
+    .how { margin-top:2.5rem; max-width:720px; }
+    .how h2 { font-size:1rem; color:#38bdf8; margin:0 0 0.75rem; }
+    .how p { font-size:0.85rem; color:#94a3b8; line-height:1.65; margin:0 0 1rem; }
+    .how code { font-size:0.8rem; background:#1e293b; border:1px solid #334155; border-radius:4px; padding:1px 5px; color:#e2e8f0; }
+    .flow { display:flex; flex-direction:column; gap:0; margin:1rem 0; }
+    .flow-step { display:flex; align-items:flex-start; gap:0.75rem; }
+    .flow-line { display:flex; flex-direction:column; align-items:center; }
+    .flow-dot { width:10px; height:10px; border-radius:999px; background:#38bdf8; flex-shrink:0; margin-top:4px; }
+    .flow-connector { width:2px; flex:1; background:#334155; min-height:18px; }
+    .flow-step:last-child .flow-connector { display:none; }
+    .flow-label { font-size:0.82rem; color:#cbd5e1; padding-bottom:18px; }
+    .flow-label strong { color:#e2e8f0; display:block; margin-bottom:0.1rem; }
   </style>
 </head>
 <body>
   <h1>Azure Region TCP RTT Matrix</h1>
   <p class="meta" id="meta">Loading snapshot…</p>
+
   <div class="legend">
     <span class="chip"><span class="dot good"></span> Good: &lt; 30 ms</span>
     <span class="chip"><span class="dot warn"></span> Warn: 30–79 ms</span>
@@ -38,10 +101,110 @@
     <span>Baseline reference: <a href="https://learn.microsoft.com/en-us/azure/networking/azure-network-latency" target="_blank" rel="noopener noreferrer">Azure network latency tables</a></span>
     <span style="margin-left:auto"><a href="https://github.com/kyjones03/azure-latency-public" target="_blank" rel="noopener noreferrer">View on GitHub</a></span>
   </div>
+
+  <div class="filters">
+    <div class="filter-card">
+      <span class="filter-label">Sources</span>
+      <details class="filter-drop" id="src-drop">
+        <summary id="src-summary">All</summary>
+        <div class="filter-drop-panel">
+          <div class="filter-actions">
+            <button id="src-all">All</button>
+            <button id="src-clear">Clear</button>
+          </div>
+          <div class="filter-options" id="src-options"></div>
+        </div>
+      </details>
+    </div>
+    <div class="filter-card">
+      <span class="filter-label">Destinations</span>
+      <details class="filter-drop" id="dst-drop">
+        <summary id="dst-summary">All</summary>
+        <div class="filter-drop-panel">
+          <div class="filter-actions">
+            <button id="dst-all">All</button>
+            <button id="dst-clear">Clear</button>
+          </div>
+          <div class="filter-options" id="dst-options"></div>
+        </div>
+      </details>
+    </div>
+  </div>
+
   <div class="wrap" id="matrix"></div>
 
+  <section class="how">
+    <h2>How it works</h2>
+    <div class="flow">
+      <div class="flow-step">
+        <div class="flow-line"><div class="flow-dot"></div><div class="flow-connector"></div></div>
+        <div class="flow-label"><strong>Azure Function Apps — one per region</strong>A timer-triggered probe runs every 5 minutes inside each of the 9 U.S. source regions.</div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-line"><div class="flow-dot"></div><div class="flow-connector"></div></div>
+        <div class="flow-label"><strong>HTTPS probe to region-pinned Storage accounts</strong>Each probe connects to a dedicated Azure Blob Storage endpoint (<code>&lt;region&gt;.blob.core.windows.net</code>) in every other region. The storage accounts are accessed over Microsoft's backbone network via VNet service endpoints — not the public internet.</div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-line"><div class="flow-dot"></div><div class="flow-connector"></div></div>
+        <div class="flow-label"><strong>15 samples per pair, aggregated to P50</strong>For each source → destination pair, 15 sequential HTTPS requests are made. The probe captures DNS resolution time, TCP handshake duration, TLS negotiation, time-to-first-byte, and total HTTP round-trip. A warmup connection is discarded before sampling begins to avoid cold-start skew. The 15 samples are reduced to a P50 (median) for each phase.</div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-line"><div class="flow-dot"></div><div class="flow-connector"></div></div>
+        <div class="flow-label"><strong>Results published to Azure Event Hubs</strong>One <code>ProbeEvent</code> per source → destination pair is published to a shared Event Hub namespace using the Function App's managed identity — no secrets involved.</div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-line"><div class="flow-dot"></div><div class="flow-connector"></div></div>
+        <div class="flow-label"><strong>GitHub Actions reads and publishes the snapshot</strong>Every 30 minutes, a workflow authenticates to Azure via OIDC federated credentials, reads the latest event per region pair from Event Hub, and writes <code>data/snapshot.json</code>. No browser credential is ever required.</div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-line"><div class="flow-dot"></div></div>
+        <div class="flow-label"><strong>This page reads the static snapshot</strong>On load, the matrix fetches <code>data/snapshot.json</code> and renders the TCP RTT values. The metric shown is the median TCP handshake time — the purest measure of raw network latency between regions, without DNS or application overhead.</div>
+      </div>
+    </div>
+    <p>Baseline values for comparison are published by Microsoft at <a href="https://learn.microsoft.com/en-us/azure/networking/azure-network-latency" target="_blank" rel="noopener noreferrer">learn.microsoft.com/azure/networking/azure-network-latency</a>.</p>
+  </section>
+
   <script>
-    const byName = (regions) => new Map(regions.map(r => [r.name, r]));
+    const LS_SOURCES = 'azlat.pub.sources';
+    const LS_DESTINATIONS = 'azlat.pub.destinations';
+
+    const state = {
+      regions: [],
+      matrix: {},
+      regionByName: new Map(),
+      sources: new Set(),
+      destinations: new Set(),
+    };
+
+    // ── persistence ─────────────────────────────────────────────────────────
+
+    function saveFilters() {
+      localStorage.setItem(LS_SOURCES, JSON.stringify([...state.sources]));
+      localStorage.setItem(LS_DESTINATIONS, JSON.stringify([...state.destinations]));
+    }
+
+    function loadFilters() {
+      const valid = new Set(state.regions.map(r => r.name));
+
+      const rawSrc = localStorage.getItem(LS_SOURCES);
+      const rawDst = localStorage.getItem(LS_DESTINATIONS);
+
+      if (rawSrc) {
+        const parsed = JSON.parse(rawSrc).filter(n => valid.has(n));
+        state.sources = parsed.length ? new Set(parsed) : new Set(valid);
+      } else {
+        state.sources = new Set(valid);
+      }
+
+      if (rawDst) {
+        const parsed = JSON.parse(rawDst).filter(n => valid.has(n));
+        state.destinations = parsed.length ? new Set(parsed) : new Set(valid);
+      } else {
+        state.destinations = new Set(valid);
+      }
+    }
+
+    // ── helpers ──────────────────────────────────────────────────────────────
 
     function band(ms) {
       if (ms == null || Number.isNaN(ms)) return 'none';
@@ -55,38 +218,110 @@
       return Math.round(ms) + ' ms';
     }
 
-    async function boot() {
-      const [regionsRes, snapshotRes] = await Promise.all([
-        fetch('./data/regions.json'),
-        fetch('./data/snapshot.json', { cache: 'no-store' })
-      ]);
+    function summaryText(selected, total) {
+      if (selected === total) return 'All';
+      if (selected === 0) return 'None';
+      return `${selected} of ${total} selected`;
+    }
 
-      if (!regionsRes.ok || !snapshotRes.ok) throw new Error('Failed to load data files');
+    // ── filter UI ────────────────────────────────────────────────────────────
 
-      const regions = await regionsRes.json();
-      const snapshot = await snapshotRes.json();
-      const matrix = snapshot.matrix || {};
-      const regionByName = byName(regions);
+    function renderFilterOptions(kind) {
+      const selected = kind === 'src' ? state.sources : state.destinations;
+      const container = document.getElementById(`${kind}-options`);
+      const summary = document.getElementById(`${kind}-summary`);
 
-      document.getElementById('meta').textContent =
-        `Generated: ${snapshot.generatedAt || 'n/a'} · probe pairs: ${snapshot.probe?.count ?? 0}`;
+      container.innerHTML = state.regions.map(r => `
+        <label>
+          <input type="checkbox" data-kind="${kind}" data-name="${r.name}" ${selected.has(r.name) ? 'checked' : ''}>
+          ${r.displayName}
+        </label>
+      `).join('');
 
+      summary.textContent = summaryText(selected.size, state.regions.length);
+    }
+
+    function bindFilterEvents() {
+      document.getElementById('src-options').addEventListener('change', e => {
+        const el = e.target;
+        if (el.type !== 'checkbox') return;
+        el.checked ? state.sources.add(el.dataset.name) : state.sources.delete(el.dataset.name);
+        document.getElementById('src-summary').textContent = summaryText(state.sources.size, state.regions.length);
+        saveFilters();
+        renderMatrix();
+      });
+
+      document.getElementById('dst-options').addEventListener('change', e => {
+        const el = e.target;
+        if (el.type !== 'checkbox') return;
+        el.checked ? state.destinations.add(el.dataset.name) : state.destinations.delete(el.dataset.name);
+        document.getElementById('dst-summary').textContent = summaryText(state.destinations.size, state.regions.length);
+        saveFilters();
+        renderMatrix();
+      });
+
+      document.getElementById('src-all').addEventListener('click', () => {
+        state.sources = new Set(state.regions.map(r => r.name));
+        renderFilterOptions('src');
+        saveFilters();
+        renderMatrix();
+      });
+
+      document.getElementById('src-clear').addEventListener('click', () => {
+        state.sources = new Set();
+        renderFilterOptions('src');
+        saveFilters();
+        renderMatrix();
+      });
+
+      document.getElementById('dst-all').addEventListener('click', () => {
+        state.destinations = new Set(state.regions.map(r => r.name));
+        renderFilterOptions('dst');
+        saveFilters();
+        renderMatrix();
+      });
+
+      document.getElementById('dst-clear').addEventListener('click', () => {
+        state.destinations = new Set();
+        renderFilterOptions('dst');
+        saveFilters();
+        renderMatrix();
+      });
+    }
+
+    // close dropdowns when clicking outside
+    document.addEventListener('click', e => {
+      ['src-drop', 'dst-drop'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el && el.open && !el.contains(e.target)) el.removeAttribute('open');
+      });
+    });
+
+    // ── matrix render ────────────────────────────────────────────────────────
+
+    function renderMatrix() {
+      const sources = state.regions.filter(r => state.sources.has(r.name));
+      const destinations = state.regions.filter(r => state.destinations.has(r.name));
+
+      // always render the table structure so clearing one axis doesn't wipe the other
       let html = '<table><tr><th></th>';
-      for (const dst of regions) html += `<th title="${dst.displayName}">${dst.shortLabel}</th>`;
+      for (const dst of destinations) {
+        html += `<th title="${dst.displayName}">${dst.shortLabel}</th>`;
+      }
       html += '</tr>';
 
-      for (const src of regions) {
+      for (const src of sources) {
         html += `<tr><th title="${src.displayName}">${src.shortLabel}</th>`;
-        for (const dst of regions) {
+        for (const dst of destinations) {
           if (src.name === dst.name) {
             html += '<td class="self">—</td>';
             continue;
           }
-          const ev = matrix[src.name]?.[dst.name] ?? null;
+          const ev = state.matrix[src.name]?.[dst.name] ?? null;
           const ms = ev?.tcpRttMs ?? null;
           const title = ev
-            ? `${regionByName.get(src.name)?.displayName} -> ${regionByName.get(dst.name)?.displayName}\nTCP RTT: ${fmt(ev.tcpRttMs)}\nTimestamp: ${ev.timestamp}`
-            : `${src.name} -> ${dst.name}: no data`;
+            ? `${state.regionByName.get(src.name)?.displayName} → ${state.regionByName.get(dst.name)?.displayName}\nTCP RTT: ${fmt(ms)}\nTimestamp: ${ev.timestamp}`
+            : `${src.name} → ${dst.name}: no data`;
           html += `<td class="${band(ms)}" title="${title}">${fmt(ms)}</td>`;
         }
         html += '</tr>';
@@ -96,7 +331,33 @@
       document.getElementById('matrix').innerHTML = html;
     }
 
-    boot().catch((err) => {
+    // ── boot ─────────────────────────────────────────────────────────────────
+
+    async function boot() {
+      const [regionsRes, snapshotRes] = await Promise.all([
+        fetch('./data/regions.json'),
+        fetch('./data/snapshot.json', { cache: 'no-store' })
+      ]);
+
+      if (!regionsRes.ok || !snapshotRes.ok) throw new Error('Failed to load data files');
+
+      state.regions = await regionsRes.json();
+      state.regionByName = new Map(state.regions.map(r => [r.name, r]));
+
+      const snapshot = await snapshotRes.json();
+      state.matrix = snapshot.matrix || {};
+
+      document.getElementById('meta').textContent =
+        `Snapshot generated: ${snapshot.generatedAt || 'n/a'} · ${snapshot.probe?.count ?? 0} probe pairs`;
+
+      loadFilters();
+      renderFilterOptions('src');
+      renderFilterOptions('dst');
+      bindFilterEvents();
+      renderMatrix();
+    }
+
+    boot().catch(err => {
       document.getElementById('meta').textContent = `Error: ${err.message}`;
       console.error(err);
     });
