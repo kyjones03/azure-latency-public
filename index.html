@@ -4,6 +4,11 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Azure Region Latency Matrix</title>
+  <link rel="icon" href="favicon.ico?v=1" sizes="any" />
+  <link rel="icon" type="image/png" href="icon/icon.png?v=1" />
+  <link rel="apple-touch-icon" href="icon/icon.png?v=1" />
+  <link rel="manifest" href="site.webmanifest?v=1" />
+  <meta name="theme-color" content="#0f172a" />
   <style>
     body { font-family: system-ui, sans-serif; margin: 24px; background:#0f172a; color:#e2e8f0; }
     h1 { color:#38bdf8; margin:0 0 8px; }
@@ -34,7 +39,7 @@
       list-style:none; display:flex; align-items:center; gap:8px;
       background:#0f172a; border:1px solid #334155; border-radius:6px;
       padding:6px 10px; font-size:0.85rem; color:#e2e8f0; cursor:pointer;
-      user-select:none; -webkit-user-select:none;
+      -webkit-user-select:none; user-select:none; 
     }
     details.filter-drop summary::-webkit-details-marker { display:none; }
     details.filter-drop summary::before {
@@ -157,7 +162,7 @@
         <div class="flow-label"><strong>GitHub Actions reads and publishes the snapshot</strong>Every 30 minutes, a workflow authenticates to Azure via OIDC federated credentials, reads the latest event per region pair from Event Hub, and writes <code>data/snapshot.json</code>. No browser credential is ever required.</div>
       </div>
       <div class="flow-step">
-        <div class="flow-line"><div class="flow-dot"></div></div>
+        <div class="flow-line"><div class="flow-dot"></div><div class="flow-connector"></div></div>
         <div class="flow-label"><strong>This page reads the static snapshot</strong>On load, the matrix fetches <code>data/snapshot.json</code> and renders the TCP RTT values. The metric shown is the median TCP handshake time — the purest measure of raw network latency between regions, without DNS or application overhead.</div>
       </div>
     </div>
